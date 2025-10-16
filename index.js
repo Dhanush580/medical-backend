@@ -13,7 +13,10 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 
 // Middlewares
-app.use(cors());
+app.use(cors({
+  origin: ['http://localhost:3000', 'http://localhost:5000', 'https://medicostsaver.vercel.app', 'https://medical-backend-e4z1.onrender.com'],
+  credentials: true
+}));
 app.use(express.json());
 app.use(morgan('dev'));
 
@@ -26,7 +29,10 @@ app.use('/api/plans', planRoutes);
 app.use('/api/partners', partnerRoutes);
 app.use('/api/payments', paymentRoutes);
 
-app.get('/', (req, res) => res.send({ ok: true, message: 'Medico Backend Running' }));
+app.get('/', (req, res) => res.send({ ok: true, message: 'Medico Backend Running', timestamp: new Date().toISOString() }));
+
+// Test endpoint
+app.get('/api/test', (req, res) => res.json({ ok: true, message: 'API is working', timestamp: new Date().toISOString() }));
 
 // Connect DB and start server
 if (process.env.MONGODB_URI) {
