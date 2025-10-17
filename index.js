@@ -8,6 +8,7 @@ const authRoutes = require('./routes/auth');
 const planRoutes = require('./routes/plans');
 const partnerRoutes = require('./routes/partners');
 const paymentRoutes = require('./routes/payments');
+const contactRoutes = require('./routes/contact');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -28,6 +29,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/plans', planRoutes);
 app.use('/api/partners', partnerRoutes);
 app.use('/api/payments', paymentRoutes);
+app.use('/api/contact', contactRoutes);
 
 app.get('/', (req, res) => res.send({ ok: true, message: 'Medico Backend Running', timestamp: new Date().toISOString() }));
 
