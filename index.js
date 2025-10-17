@@ -14,7 +14,7 @@ const PORT = process.env.PORT || 5000;
 
 // Middlewares
 app.use(cors({
-  origin: ['http://localhost:3000', 'http://localhost:5000', 'https://medicostsaver.vercel.app', 'https://medical-backend-e4z1.onrender.com'],
+  origin: ['http://localhost:3000', 'http://localhost:5173', 'http://localhost:8080', 'http://localhost:5000', 'https://medicostsaver.vercel.app', 'https://medical-backend-e4z1.onrender.com'],
   credentials: true
 }));
 app.use(express.json());
