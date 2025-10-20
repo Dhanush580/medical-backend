@@ -18,7 +18,9 @@ exports.register = async (req, res) => {
     if (existing) return res.status(409).json({ message: 'Email already in use' });
 
   const members = Math.max(0, Number(familyMembers) || (Array.isArray(familyDetails) ? familyDetails.length : 0));
-  const user = new User({ name, email, phone, password, plan, familyMembers: members, familyDetails: Array.isArray(familyDetails) ? familyDetails : [] });
+  // Ensure phone has +91 prefix
+  const phoneWithPrefix = phone.startsWith('+91') ? phone : `+91${phone}`;
+  const user = new User({ name, email, phone: phoneWithPrefix, password, plan, familyMembers: members, familyDetails: Array.isArray(familyDetails) ? familyDetails : [] });
 
   // Set validity: annual plan -> 1 year from now
   const now = new Date();
@@ -62,7 +64,8 @@ exports.registerWithOrder = async (req, res) => {
     const order = await instance.orders.create({ amount: Math.round(amount * 100), currency: 'INR', receipt: `reg_${Date.now()}` });
 
     // Send back order info and the received form data for frontend to complete payment
-  res.json({ order, tempUser: { name, email, phone, password, plan, familyMembers: members, familyDetails: Array.isArray(familyDetails) ? familyDetails : [] } });
+  const phoneWithPrefix = phone.startsWith('+91') ? phone : `+91${phone}`;
+  res.json({ order, tempUser: { name, email, phone: phoneWithPrefix, password, plan, familyMembers: members, familyDetails: Array.isArray(familyDetails) ? familyDetails : [] } });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Failed to create registration order' });
@@ -133,6 +136,36 @@ exports.loginAdmin = async (req, res) => {
 
     const token = createToken({ _id: admin._id, email: admin.email, isAdmin: true }, process.env.JWT_SECRET);
     res.json({ token, admin: { id: admin._id, email: admin.email, name: admin.name } });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+exports.checkEmail = async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email) {
+      return res.status(400).json({ message: 'Email is required' });
+    }
+
+    const existing = await User.findOne({ email });
+    res.json({ exists: !!existing });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+exports.checkEmail = async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email) {
+      return res.status(400).json({ message: 'Email is required' });
+    }
+
+    const existing = await User.findOne({ email });
+    res.json({ exists: !!existing });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Server error' });
