@@ -237,6 +237,13 @@ exports.register = async (req, res) => {
       district,
       pincode,
       clinicName,
+      specialization,
+      timeFrom,
+      timeTo,
+      dayFrom,
+      dayTo,
+      discountAmount,
+      discountItems,
     } = req.body;
 
     if (!responsibleName || !contactEmail || !email || !password) return res.status(400).json({ message: 'Missing required fields' });
@@ -262,7 +269,15 @@ exports.register = async (req, res) => {
         name: councilName,
         number: councilNumber,
       },
+      specialization,
+      timings: timings || undefined,
+      timeFrom: timeFrom || undefined,
+      timeTo: timeTo || undefined,
+      dayFrom: dayFrom || undefined,
+      dayTo: dayTo || undefined,
       clinicName: clinicName || undefined,
+      discountAmount,
+      discountItems: discountItems ? JSON.parse(discountItems) : [],
     });
 
     await partner.save();
@@ -373,8 +388,8 @@ exports.getRecentPartners = async (req, res) => {
 exports.login = async (req, res) => {
   try {
     const { email, password } = req.body;
-    const partner = await Partner.findOne({ email, status: { $in: ['Active', 'Pending'] } });
-    if (!partner) return res.status(401).json({ message: 'Invalid credentials' });
+    const partner = await Partner.findOne({ email, status: 'Active' });
+    if (!partner) return res.status(401).json({ message: 'Invalid credentials or account not approved yet' });
     const match = await partner.comparePassword(password);
     if (!match) return res.status(401).json({ message: 'Invalid credentials' });
 

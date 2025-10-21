@@ -3,12 +3,13 @@ const router = express.Router();
 const partnerController = require('../controllers/partnerController');
 const multer = require('multer');
 const isAdmin = require('../middlewares/isAdmin');
+const isPartner = require('../middlewares/isPartner');
 
 // Use memory storage; controller will persist files to disk under uploads/partners/<id>/
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
-router.post('/verify', partnerController.verifyMembership);
-router.post('/visit', partnerController.recordVisit);
+router.post('/verify', isPartner, partnerController.verifyMembership);
+router.post('/visit', isPartner, partnerController.recordVisit);
 // fields: passportPhoto (single), certificateFile (single), clinicPhotos (array)
 router.post('/register', upload.fields([
 	{ name: 'passportPhoto', maxCount: 1 },
@@ -31,9 +32,9 @@ router.get('/recent-partners', isAdmin, partnerController.getRecentPartners);
 router.post('/login', partnerController.login);
 
 // User visits
-router.get('/my-visits', partnerController.getUserVisits);
+router.get('/my-visits', isPartner, partnerController.getUserVisits);
 
 // Partner stats
-router.get('/partner-stats', partnerController.getPartnerStats);
+router.get('/partner-stats', isPartner, partnerController.getPartnerStats);
 
 module.exports = router;
