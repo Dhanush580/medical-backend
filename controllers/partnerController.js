@@ -53,13 +53,8 @@ exports.recordVisit = async (req, res) => {
 
 exports.getUserVisits = async (req, res) => {
   try {
-    // Get user from JWT token
-    const token = req.headers.authorization?.split(' ')[1];
-    if (!token) return res.status(401).json({ message: 'No token provided' });
-
-    const jwt = require('jsonwebtoken');
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const userId = decoded.id;
+    // Get user ID from auth middleware
+    const userId = req.userId;
 
     const visits = await Visit.find({ user: userId })
       .populate('partner', 'name type address')

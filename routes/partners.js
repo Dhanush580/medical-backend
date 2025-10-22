@@ -4,6 +4,7 @@ const partnerController = require('../controllers/partnerController');
 const multer = require('multer');
 const isAdmin = require('../middlewares/isAdmin');
 const isPartner = require('../middlewares/isPartner');
+const auth = require('../middlewares/auth');
 
 // Use memory storage; controller will persist files to disk under uploads/partners/<id>/
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
@@ -32,7 +33,7 @@ router.get('/recent-partners', isAdmin, partnerController.getRecentPartners);
 router.post('/login', partnerController.login);
 
 // User visits
-router.get('/my-visits', isPartner, partnerController.getUserVisits);
+router.get('/my-visits', auth, partnerController.getUserVisits);
 
 // Partner stats
 router.get('/partner-stats', isPartner, partnerController.getPartnerStats);
