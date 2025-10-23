@@ -135,7 +135,7 @@ exports.getPartnerStats = async (req, res) => {
 
 exports.listPartners = async (req, res) => {
   try {
-    const { q, type, state, district, page = 1, limit = 10 } = req.query;
+    const { q, type, state, district, specialization, page = 1, limit = 10 } = req.query;
     const skip = (page - 1) * limit;
 
     // Build search query
@@ -160,6 +160,10 @@ exports.listPartners = async (req, res) => {
 
     if (district) {
       query.district = { $regex: `^${district.trim()}$`, $options: 'i' };
+    }
+
+    if (specialization && specialization !== 'all') {
+      query.specialization = { $regex: `^${specialization.trim()}$`, $options: 'i' };
     }
 
     // Get total count for pagination
