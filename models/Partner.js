@@ -28,7 +28,6 @@ const partnerSchema = new mongoose.Schema(
     timeTo: { type: String },
     dayFrom: { type: String },
     dayTo: { type: String },
-    passportPhoto: { type: String },
     certificateFile: { type: String },
     clinicPhotos: { type: [String], default: [] },
     discountAmount: { type: String, required: true },

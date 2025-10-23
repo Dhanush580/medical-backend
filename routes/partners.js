@@ -11,9 +11,8 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 
 
 router.post('/verify', isPartner, partnerController.verifyMembership);
 router.post('/visit', isPartner, partnerController.recordVisit);
-// fields: passportPhoto (single), certificateFile (single), clinicPhotos (array)
+// fields: certificateFile (single), clinicPhotos (array)
 router.post('/register', upload.fields([
-	{ name: 'passportPhoto', maxCount: 1 },
 	{ name: 'certificateFile', maxCount: 1 },
 	{ name: 'clinicPhotos', maxCount: 6 },
 ]), partnerController.register);

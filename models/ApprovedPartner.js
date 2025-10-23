@@ -20,7 +20,6 @@ const approvedPartnerSchema = new mongoose.Schema(
       name: String,
       number: String,
     },
-    passportPhoto: { type: String },
     certificateFile: { type: String },
     clinicPhotos: { type: [String], default: [] },
     membersServed: { type: Number, default: 0 },

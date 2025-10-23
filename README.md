@@ -35,7 +35,7 @@ File uploads
 
 Partner registration accepts multipart/form-data at POST /api/partners/register and stores uploaded files on local disk under `backend/uploads/partners/<partnerId>/`.
 
-Uploaded fields handled: `passportPhoto` (single), `certificateFile` (single), `clinicPhotos` (multiple).
+Uploaded fields handled: `certificateFile` (single), `clinicPhotos` (multiple).
 
-The Partner document stores relative paths to saved files in the fields `passportPhoto`, `certificateFile`, and `clinicPhotos`.
+The Partner document stores relative paths to saved files in the fields `certificateFile`, and `clinicPhotos`.
 

@@ -14,7 +14,6 @@ async function main() {
     return;
   }
   console.log('Partner id:', p._id);
-  console.log('passportPhoto:', p.passportPhoto);
   console.log('certificateFile:', p.certificateFile);
   console.log('clinicPhotos:', p.clinicPhotos);
   console.log('full partner doc:', JSON.stringify(p, null, 2));

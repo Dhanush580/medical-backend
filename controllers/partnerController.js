@@ -200,21 +200,6 @@ exports.listApplications = async (req, res) => {
     const processedApps = await Promise.all(apps.map(async (app) => {
       const appObj = app.toObject();
 
-      // Convert passport photo
-      if (appObj.passportPhoto) {
-        try {
-          const filePath = path.join(__dirname, '..', appObj.passportPhoto);
-          if (fs.existsSync(filePath)) {
-            const fileBuffer = fs.readFileSync(filePath);
-            const mimeType = getMimeType(filePath);
-            appObj.passportPhoto = `data:${mimeType};base64,${fileBuffer.toString('base64')}`;
-          }
-        } catch (error) {
-          console.error('Error converting passport photo:', error);
-          appObj.passportPhoto = null;
-        }
-      }
-
       // Convert certificate file
       if (appObj.certificateFile) {
         try {
@@ -383,15 +368,6 @@ exports.register = async (req, res) => {
 
     // Use a single timestamp for all files in this request to avoid mismatches
     const timestamp = Date.now();
-
-    // passportPhoto
-    if (files.passportPhoto && files.passportPhoto.length > 0) {
-      const f = files.passportPhoto[0];
-      const dest = path.join(uploadsBase, `passport_${timestamp}_${f.originalname}`);
-      fs.writeFileSync(dest, f.buffer);
-      // Store path relative to uploads directory for proper static serving
-      partner.passportPhoto = `uploads/partners/${partner._id}/passport_${timestamp}_${f.originalname}`;
-    }
 
     // certificateFile
     if (files.certificateFile && files.certificateFile.length > 0) {
