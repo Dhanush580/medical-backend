@@ -22,7 +22,7 @@ app.use(cors({
 // Body parsing middleware
 app.use(express.json());
 
-// Serve uploaded files with CORS enabled for all origins (for file access)
+// Serve uploaded files with CORS enabled for all origins (for file access) - kept for backward compatibility
 app.use('/uploads', express.static(path.join(__dirname, 'uploads'), {
   setHeaders: (res, path) => {
     res.set('Access-Control-Allow-Origin', '*');

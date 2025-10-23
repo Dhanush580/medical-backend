@@ -196,47 +196,8 @@ exports.listApplications = async (req, res) => {
   try {
     const apps = await Partner.find({ status: 'Pending' }).sort({ createdAt: -1 }).limit(200);
 
-    // Convert file paths to base64 data URLs for reliable image display
-    const processedApps = await Promise.all(apps.map(async (app) => {
-      const appObj = app.toObject();
-
-      // Convert certificate file
-      if (appObj.certificateFile) {
-        try {
-          const filePath = path.join(__dirname, '..', appObj.certificateFile);
-          if (fs.existsSync(filePath)) {
-            const fileBuffer = fs.readFileSync(filePath);
-            const mimeType = getMimeType(filePath);
-            appObj.certificateFile = `data:${mimeType};base64,${fileBuffer.toString('base64')}`;
-          }
-        } catch (error) {
-          console.error('Error converting certificate file:', error);
-          appObj.certificateFile = null;
-        }
-      }
-
-      // Convert clinic photos
-      if (appObj.clinicPhotos && Array.isArray(appObj.clinicPhotos)) {
-        appObj.clinicPhotos = await Promise.all(appObj.clinicPhotos.map(async (photoPath) => {
-          try {
-            const filePath = path.join(__dirname, '..', photoPath);
-            if (fs.existsSync(filePath)) {
-              const fileBuffer = fs.readFileSync(filePath);
-              const mimeType = getMimeType(filePath);
-              return `data:${mimeType};base64,${fileBuffer.toString('base64')}`;
-            }
-            return null;
-          } catch (error) {
-            console.error('Error converting clinic photo:', error);
-            return null;
-          }
-        }));
-      }
-
-      return appObj;
-    }));
-
-    res.json(processedApps);
+    // Files are already stored as base64 data URLs in the database
+    res.json(apps);
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Server error' });
@@ -269,16 +230,7 @@ exports.rejectApplication = async (req, res) => {
     const p = await Partner.findById(id);
     if (!p) return res.status(404).json({ message: 'Application not found' });
 
-    // Delete uploaded files if present
-    const uploadsRoot = path.join(__dirname, '..', 'uploads');
-    const srcDir = path.join(uploadsRoot, 'partners', String(p._id));
-    if (fs.existsSync(srcDir)) {
-      try {
-        fs.rmdirSync(srcDir, { recursive: true });
-      } catch (e) {
-        console.warn('Could not remove upload dir', srcDir, e.message);
-      }
-    }
+    // Files are stored in database as base64, no need to delete from disk
 
     // Save a rejection record: set status and rejectionReason and keep record OR delete doc.
     // Here we will delete the application document entirely.
@@ -361,31 +313,22 @@ exports.register = async (req, res) => {
 
     // handle files: req.files contains buffers from multer memoryStorage
     const files = req.files || {};
-    const fs = require('fs');
-    const path = require('path');
-    const uploadsBase = path.join(__dirname, '..', 'uploads', 'partners', String(partner._id));
-    if (!fs.existsSync(uploadsBase)) fs.mkdirSync(uploadsBase, { recursive: true });
-
-    // Use a single timestamp for all files in this request to avoid mismatches
-    const timestamp = Date.now();
 
     // certificateFile
     if (files.certificateFile && files.certificateFile.length > 0) {
       const f = files.certificateFile[0];
-      const dest = path.join(uploadsBase, `certificate_${timestamp}_${f.originalname}`);
-      fs.writeFileSync(dest, f.buffer);
-      // Store path relative to uploads directory for proper static serving
-      partner.certificateFile = `uploads/partners/${partner._id}/certificate_${timestamp}_${f.originalname}`;
+      const mimeType = getMimeType(f.originalname);
+      const base64 = f.buffer.toString('base64');
+      partner.certificateFile = `data:${mimeType};base64,${base64}`;
     }
 
     // clinicPhotos (multiple)
     if (files.clinicPhotos && files.clinicPhotos.length > 0) {
       partner.clinicPhotos = [];
-      files.clinicPhotos.forEach((f, index) => {
-        const dest = path.join(uploadsBase, `clinic_${timestamp}_${index}_${f.originalname}`);
-        fs.writeFileSync(dest, f.buffer);
-        // Store path relative to uploads directory for proper static serving
-        partner.clinicPhotos.push(`uploads/partners/${partner._id}/clinic_${timestamp}_${index}_${f.originalname}`);
+      files.clinicPhotos.forEach((f) => {
+        const mimeType = getMimeType(f.originalname);
+        const base64 = f.buffer.toString('base64');
+        partner.clinicPhotos.push(`data:${mimeType};base64,${base64}`);
       });
     }
 
