@@ -89,6 +89,20 @@ exports.updateQuery = async (req, res) => {
     const { status, adminResponse } = req.body;
     const adminId = req.adminId; // From auth middleware
 
+    // If status is resolved, delete the query instead of updating
+    if (status === 'resolved') {
+      const query = await ContactQuery.findByIdAndDelete(req.params.id);
+
+      if (!query) {
+        return res.status(404).json({ message: 'Query not found' });
+      }
+
+      return res.json({
+        message: 'Query resolved and removed successfully',
+        deleted: true
+      });
+    }
+
     const updateData = { status };
     if (adminResponse) {
       updateData.adminResponse = adminResponse;

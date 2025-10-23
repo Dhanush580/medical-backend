@@ -28,6 +28,10 @@ router.post('/applications/:id/reject', isAdmin, partnerController.rejectApplica
 router.get('/stats', isAdmin, partnerController.getStats);
 router.get('/recent-members', isAdmin, partnerController.getRecentMembers);
 router.get('/recent-partners', isAdmin, partnerController.getRecentPartners);
+router.get('/all-users', isAdmin, partnerController.getAllUsers);
+router.get('/all-partners', isAdmin, partnerController.getAllPartners);
+router.delete('/partners/:id', isAdmin, partnerController.deletePartner);
+router.delete('/users/:id', isAdmin, partnerController.deleteUser);
 
 // Partner login
 router.post('/login', partnerController.login);

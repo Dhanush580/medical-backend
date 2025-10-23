@@ -5,6 +5,21 @@ const User = require('../models/User');
 const fs = require('fs');
 const path = require('path');
 
+// Helper function to get MIME type from file extension
+const getMimeType = (filePath) => {
+  const ext = path.extname(filePath).toLowerCase();
+  const mimeTypes = {
+    '.jpg': 'image/jpeg',
+    '.jpeg': 'image/jpeg',
+    '.png': 'image/png',
+    '.gif': 'image/gif',
+    '.pdf': 'application/pdf',
+    '.doc': 'application/msword',
+    '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+  };
+  return mimeTypes[ext] || 'application/octet-stream';
+};
+
 exports.verifyMembership = async (req, res) => {
   try {
     const { membershipId } = req.body;
@@ -12,8 +27,8 @@ exports.verifyMembership = async (req, res) => {
     if (!user) return res.status(404).json({ valid: false, message: 'Membership not found' });
 
     // return basic membership info
-    // Compute discount: if familyMembers > 0 then 10% on total (as per new pricing), otherwise 0-10% base as configured
-    const discount = user.familyMembers && user.familyMembers > 0 ? '10%' : '0%';
+    // All members get 10% discount at partner facilities
+    const discount = '10%';
     res.json({
       valid: true,
       member: {
@@ -57,18 +72,23 @@ exports.getUserVisits = async (req, res) => {
     const userId = req.userId;
 
     const visits = await Visit.find({ user: userId })
-      .populate('partner', 'name type address')
+      .populate('partner', 'name type address responsible')
       .sort({ createdAt: -1 })
       .limit(10);
 
     const formattedVisits = visits.map(visit => ({
       id: visit._id,
-      facility: visit.partner?.name || 'Unknown Facility',
-      type: visit.partner?.type || 'Unknown',
-      service: visit.service || 'General Consultation',
-      date: visit.createdAt.toLocaleDateString('en-IN'),
-      discount: visit.discountApplied ? `₹${visit.savedAmount || 0}` : '₹0',
-      savedAmount: visit.savedAmount || 0
+      hospitalName: visit.partner?.name || 'Unknown Hospital',
+      doctorName: visit.partner?.responsible?.name || 'Not specified',
+      address: visit.partner?.address || 'Address not available',
+      visitedTime: visit.createdAt.toLocaleString('en-IN', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      }),
+      service: visit.service || 'General Consultation'
     }));
 
     res.json(formattedVisits);
@@ -175,7 +195,63 @@ exports.listPartners = async (req, res) => {
 exports.listApplications = async (req, res) => {
   try {
     const apps = await Partner.find({ status: 'Pending' }).sort({ createdAt: -1 }).limit(200);
-    res.json(apps);
+
+    // Convert file paths to base64 data URLs for reliable image display
+    const processedApps = await Promise.all(apps.map(async (app) => {
+      const appObj = app.toObject();
+
+      // Convert passport photo
+      if (appObj.passportPhoto) {
+        try {
+          const filePath = path.join(__dirname, '..', appObj.passportPhoto);
+          if (fs.existsSync(filePath)) {
+            const fileBuffer = fs.readFileSync(filePath);
+            const mimeType = getMimeType(filePath);
+            appObj.passportPhoto = `data:${mimeType};base64,${fileBuffer.toString('base64')}`;
+          }
+        } catch (error) {
+          console.error('Error converting passport photo:', error);
+          appObj.passportPhoto = null;
+        }
+      }
+
+      // Convert certificate file
+      if (appObj.certificateFile) {
+        try {
+          const filePath = path.join(__dirname, '..', appObj.certificateFile);
+          if (fs.existsSync(filePath)) {
+            const fileBuffer = fs.readFileSync(filePath);
+            const mimeType = getMimeType(filePath);
+            appObj.certificateFile = `data:${mimeType};base64,${fileBuffer.toString('base64')}`;
+          }
+        } catch (error) {
+          console.error('Error converting certificate file:', error);
+          appObj.certificateFile = null;
+        }
+      }
+
+      // Convert clinic photos
+      if (appObj.clinicPhotos && Array.isArray(appObj.clinicPhotos)) {
+        appObj.clinicPhotos = await Promise.all(appObj.clinicPhotos.map(async (photoPath) => {
+          try {
+            const filePath = path.join(__dirname, '..', photoPath);
+            if (fs.existsSync(filePath)) {
+              const fileBuffer = fs.readFileSync(filePath);
+              const mimeType = getMimeType(filePath);
+              return `data:${mimeType};base64,${fileBuffer.toString('base64')}`;
+            }
+            return null;
+          } catch (error) {
+            console.error('Error converting clinic photo:', error);
+            return null;
+          }
+        }));
+      }
+
+      return appObj;
+    }));
+
+    res.json(processedApps);
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Server error' });
@@ -305,29 +381,35 @@ exports.register = async (req, res) => {
     const uploadsBase = path.join(__dirname, '..', 'uploads', 'partners', String(partner._id));
     if (!fs.existsSync(uploadsBase)) fs.mkdirSync(uploadsBase, { recursive: true });
 
+    // Use a single timestamp for all files in this request to avoid mismatches
+    const timestamp = Date.now();
+
     // passportPhoto
     if (files.passportPhoto && files.passportPhoto.length > 0) {
       const f = files.passportPhoto[0];
-      const dest = path.join(uploadsBase, `passport_${Date.now()}_${f.originalname}`);
+      const dest = path.join(uploadsBase, `passport_${timestamp}_${f.originalname}`);
       fs.writeFileSync(dest, f.buffer);
-      partner.passportPhoto = path.relative(path.join(__dirname, '..'), dest).replace(/\\/g, '/');
+      // Store path relative to uploads directory for proper static serving
+      partner.passportPhoto = `uploads/partners/${partner._id}/passport_${timestamp}_${f.originalname}`;
     }
 
     // certificateFile
     if (files.certificateFile && files.certificateFile.length > 0) {
       const f = files.certificateFile[0];
-      const dest = path.join(uploadsBase, `certificate_${Date.now()}_${f.originalname}`);
+      const dest = path.join(uploadsBase, `certificate_${timestamp}_${f.originalname}`);
       fs.writeFileSync(dest, f.buffer);
-      partner.certificateFile = path.relative(path.join(__dirname, '..'), dest).replace(/\\/g, '/');
+      // Store path relative to uploads directory for proper static serving
+      partner.certificateFile = `uploads/partners/${partner._id}/certificate_${timestamp}_${f.originalname}`;
     }
 
     // clinicPhotos (multiple)
     if (files.clinicPhotos && files.clinicPhotos.length > 0) {
       partner.clinicPhotos = [];
-      files.clinicPhotos.forEach((f) => {
-        const dest = path.join(uploadsBase, `clinic_${Date.now()}_${f.originalname}`);
+      files.clinicPhotos.forEach((f, index) => {
+        const dest = path.join(uploadsBase, `clinic_${timestamp}_${index}_${f.originalname}`);
         fs.writeFileSync(dest, f.buffer);
-        partner.clinicPhotos.push(path.relative(path.join(__dirname, '..'), dest).replace(/\\/g, '/'));
+        // Store path relative to uploads directory for proper static serving
+        partner.clinicPhotos.push(`uploads/partners/${partner._id}/clinic_${timestamp}_${index}_${f.originalname}`);
       });
     }
 
@@ -474,61 +556,124 @@ exports.login = async (req, res) => {
   }
 };
 
-// List partners for members (with search and pagination)
-exports.listPartners = async (req, res) => {
+// Get all users with pagination (Admin only)
+exports.getAllUsers = async (req, res) => {
   try {
-    const { q, type, state, district, page = 1, limit = 10 } = req.query;
-    const skip = (page - 1) * limit;
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const search = req.query.search || '';
 
-    // Build search query
-    let query = { status: 'Active' };
-
-    if (q && q.trim()) {
-      query.$or = [
-        { name: { $regex: q.trim(), $options: 'i' } },
-        { clinicName: { $regex: q.trim(), $options: 'i' } },
-        { specialization: { $regex: q.trim(), $options: 'i' } },
-        { address: { $regex: q.trim(), $options: 'i' } }
-      ];
+    let filter = {};
+    if (search) {
+      filter = {
+        $or: [
+          { name: { $regex: search, $options: 'i' } },
+          { email: { $regex: search, $options: 'i' } },
+          { membershipId: { $regex: search, $options: 'i' } }
+        ]
+      };
     }
 
-    if (type && type !== 'all') {
-      query.type = type;
-    }
-
-    if (state) {
-      query.state = { $regex: `^${state.trim()}$`, $options: 'i' };
-    }
-
-    if (district) {
-      query.district = { $regex: `^${district.trim()}$`, $options: 'i' };
-    }
-
-    // Get total count for pagination
-    const totalPartners = await Partner.countDocuments(query);
-
-    // Get paginated results
-    const partners = await Partner.find(query)
-      .select('name type clinicName specialization address state district contactPhone contactEmail discountAmount discountItems timings timeFrom timeTo dayFrom dayTo')
+    const users = await User.find(filter)
+      .select('name email membershipId plan validUntil createdAt')
       .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(limit);
+      .limit(limit)
+      .skip((page - 1) * limit);
 
-    const totalPages = Math.ceil(totalPartners / limit);
+    const total = await User.countDocuments(filter);
+    const totalPages = Math.ceil(total / limit);
+
+    res.json({
+      users,
+      pagination: {
+        currentPage: page,
+        totalPages,
+        totalUsers: total,
+        hasNextPage: page < totalPages,
+        hasPrevPage: page > 1,
+        limit
+      }
+    });
+  } catch (err) {
+    console.error('Get all users error:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// Get all active partners with pagination (Admin only) - ALL ACTIVE PARTNERS
+exports.getAllPartners = async (req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const search = req.query.search || '';
+
+    let filter = { status: 'Active' }; // Only show active partners
+    if (search) {
+      filter = {
+        status: 'Active',
+        $or: [
+          { name: { $regex: search, $options: 'i' } },
+          { email: { $regex: search, $options: 'i' } },
+          { clinicName: { $regex: search, $options: 'i' } },
+          { facilityType: { $regex: search, $options: 'i' } }
+        ]
+      };
+    }
+
+    const partners = await Partner.find(filter)
+      .select('name email clinicName facilityType address contactPhone contactEmail membersServed status createdAt')
+      .sort({ createdAt: -1 })
+      .limit(limit)
+      .skip((page - 1) * limit);
+
+    const total = await Partner.countDocuments(filter);
+    const totalPages = Math.ceil(total / limit);
 
     res.json({
       partners,
       pagination: {
-        currentPage: parseInt(page),
+        currentPage: page,
         totalPages,
-        totalPartners,
-        hasNextPage: parseInt(page) < totalPages,
-        hasPrevPage: parseInt(page) > 1,
-        limit: parseInt(limit)
+        totalPartners: total,
+        hasNextPage: page < totalPages,
+        hasPrevPage: page > 1,
+        limit
       }
     });
   } catch (err) {
-    console.error(err);
+    console.error('Get all partners error:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// Delete partner (Admin only)
+exports.deletePartner = async (req, res) => {
+  try {
+    const partner = await Partner.findByIdAndDelete(req.params.id);
+
+    if (!partner) {
+      return res.status(404).json({ message: 'Partner not found' });
+    }
+
+    res.json({ message: 'Partner deleted successfully' });
+  } catch (err) {
+    console.error('Delete partner error:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// Delete user (Admin only)
+exports.deleteUser = async (req, res) => {
+  try {
+    const user = await User.findByIdAndDelete(req.params.id);
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    res.json({ message: 'User deleted successfully' });
+  } catch (err) {
+    console.error('Delete user error:', err);
     res.status(500).json({ message: 'Server error' });
   }
 };

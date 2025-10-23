@@ -11,6 +11,7 @@ router.post('/submit', contactController.submitContactForm);
 router.get('/queries', authMiddleware, isAdminMiddleware, contactController.getAllQueries);
 router.get('/queries/:id', authMiddleware, isAdminMiddleware, contactController.getQueryById);
 router.put('/queries/:id', authMiddleware, isAdminMiddleware, contactController.updateQuery);
+router.put('/queries/:id/status', authMiddleware, isAdminMiddleware, contactController.updateQuery);
 router.delete('/queries/:id', authMiddleware, isAdminMiddleware, contactController.deleteQuery);
 router.get('/stats', authMiddleware, isAdminMiddleware, contactController.getQueryStats);
 

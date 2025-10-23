@@ -18,11 +18,18 @@ app.use(cors({
   origin: ['http://localhost:3000', 'http://localhost:5173', 'http://localhost:8080', 'http://localhost:5000', 'https://medicostsaver.vercel.app', 'https://medical-backend-e4z1.onrender.com'],
   credentials: true
 }));
-app.use(express.json());
-app.use(morgan('dev'));
 
-// Serve uploaded files (e.g. partner uploads) as static assets
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+// Body parsing middleware
+app.use(express.json());
+
+// Serve uploaded files with CORS enabled for all origins (for file access)
+app.use('/uploads', express.static(path.join(__dirname, 'uploads'), {
+  setHeaders: (res, path) => {
+    res.set('Access-Control-Allow-Origin', '*');
+    res.set('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+    res.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  }
+}));
 
 // Routes
 app.use('/api/auth', authRoutes);

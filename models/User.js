@@ -51,7 +51,7 @@ userSchema.methods.comparePassword = async function (candidatePassword) {
 userSchema.post('save', async function (doc, next) {
   try {
     if (!doc.membershipId) {
-      const membershipId = `HC-${new Date().getFullYear()}-${String(doc._id).slice(-6).toUpperCase()}`;
+      const membershipId = `MCS-${new Date().getFullYear()}-${String(doc._id).slice(-6).toUpperCase()}`;
       // Use findByIdAndUpdate to avoid triggering another save hook on the same doc
       await mongoose.model('User').findByIdAndUpdate(doc._id, { membershipId }, { new: true, timestamps: false });
     }
