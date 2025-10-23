@@ -115,35 +115,56 @@ exports.getPartnerStats = async (req, res) => {
 
 exports.listPartners = async (req, res) => {
   try {
-    const q = (req.query.q || '').toString().trim();
-    const state = (req.query.state || '').toString().trim();
-    const district = (req.query.district || '').toString().trim();
-    const type = (req.query.type || '').toString().trim();
+    const { q, type, state, district, page = 1, limit = 10 } = req.query;
+    const skip = (page - 1) * limit;
 
-    const filter = { status: 'Active' }; // Only show active partners
+    // Build search query
+    let query = { status: 'Active' };
 
-    if (q) {
-      filter.$or = [
-        { name: { $regex: q, $options: 'i' } },
-        { type: { $regex: q, $options: 'i' } },
-        { address: { $regex: q, $options: 'i' } }
+    if (q && q.trim()) {
+      query.$or = [
+        { name: { $regex: q.trim(), $options: 'i' } },
+        { clinicName: { $regex: q.trim(), $options: 'i' } },
+        { specialization: { $regex: q.trim(), $options: 'i' } },
+        { address: { $regex: q.trim(), $options: 'i' } }
       ];
     }
 
+    if (type && type !== 'all') {
+      query.type = type;
+    }
+
     if (state) {
-      filter.state = { $regex: state, $options: 'i' };
+      query.state = { $regex: `^${state.trim()}$`, $options: 'i' };
     }
 
     if (district) {
-      filter.district = { $regex: district, $options: 'i' };
+      query.district = { $regex: `^${district.trim()}$`, $options: 'i' };
     }
 
-    if (type && type !== 'all') {
-      filter.type = type;
-    }
+    // Get total count for pagination
+    const totalPartners = await Partner.countDocuments(query);
 
-    const partners = await Partner.find(filter).limit(100);
-    res.json(partners);
+    // Get paginated results
+    const partners = await Partner.find(query)
+      .select('name type clinicName specialization address state district contactPhone contactEmail discountAmount discountItems timings timeFrom timeTo dayFrom dayTo')
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit);
+
+    const totalPages = Math.ceil(totalPartners / limit);
+
+    res.json({
+      partners,
+      pagination: {
+        currentPage: parseInt(page),
+        totalPages,
+        totalPartners,
+        hasNextPage: parseInt(page) < totalPages,
+        hasPrevPage: parseInt(page) > 1,
+        limit: parseInt(limit)
+      }
+    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Server error' });
@@ -379,6 +400,62 @@ exports.getRecentPartners = async (req, res) => {
   }
 };;
 
+exports.getPartnerVisits = async (req, res) => {
+  try {
+    // Get partner from JWT token
+    const token = req.headers.authorization?.split(' ')[1];
+    if (!token) return res.status(401).json({ message: 'No token provided' });
+
+    const jwt = require('jsonwebtoken');
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const partnerId = decoded.id;
+
+    // Pagination parameters
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
+
+    // Get total count for pagination
+    const totalVisits = await Visit.countDocuments({ partner: partnerId });
+
+    const visits = await Visit.find({ partner: partnerId })
+      .populate('user', 'name membershipId email phone')
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit);
+
+    const formattedVisits = visits.map(visit => ({
+      id: visit._id,
+      memberName: visit.user?.name || 'Unknown Member',
+      membershipId: visit.user?.membershipId || 'N/A',
+      email: visit.user?.email || 'N/A',
+      phone: visit.user?.phone || 'N/A',
+      service: visit.service || 'General Service',
+      discount: `${visit.discountApplied}%`,
+      savedAmount: visit.savedAmount || 0,
+      date: visit.createdAt.toLocaleDateString('en-IN'),
+      time: visit.createdAt.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })
+    }));
+
+    const totalPages = Math.ceil(totalVisits / limit);
+
+    res.json({
+      visits: formattedVisits,
+      pagination: {
+        currentPage: page,
+        totalPages,
+        totalVisits,
+        hasNextPage: page < totalPages,
+        hasPrevPage: page > 1,
+        limit
+      }
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
 // Partner login
 exports.login = async (req, res) => {
   try {
@@ -391,6 +468,65 @@ exports.login = async (req, res) => {
     const jwt = require('jsonwebtoken');
     const token = jwt.sign({ id: partner._id, email: partner.email, type: 'partner' }, process.env.JWT_SECRET, { expiresIn: '7d' });
     res.json({ token, partner: { id: partner._id, email: partner.email, name: partner.name, type: partner.type } });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// List partners for members (with search and pagination)
+exports.listPartners = async (req, res) => {
+  try {
+    const { q, type, state, district, page = 1, limit = 10 } = req.query;
+    const skip = (page - 1) * limit;
+
+    // Build search query
+    let query = { status: 'Active' };
+
+    if (q && q.trim()) {
+      query.$or = [
+        { name: { $regex: q.trim(), $options: 'i' } },
+        { clinicName: { $regex: q.trim(), $options: 'i' } },
+        { specialization: { $regex: q.trim(), $options: 'i' } },
+        { address: { $regex: q.trim(), $options: 'i' } }
+      ];
+    }
+
+    if (type && type !== 'all') {
+      query.type = type;
+    }
+
+    if (state) {
+      query.state = { $regex: `^${state.trim()}$`, $options: 'i' };
+    }
+
+    if (district) {
+      query.district = { $regex: `^${district.trim()}$`, $options: 'i' };
+    }
+
+    // Get total count for pagination
+    const totalPartners = await Partner.countDocuments(query);
+
+    // Get paginated results
+    const partners = await Partner.find(query)
+      .select('name type clinicName specialization address state district contactPhone contactEmail discountAmount discountItems timings timeFrom timeTo dayFrom dayTo')
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit);
+
+    const totalPages = Math.ceil(totalPartners / limit);
+
+    res.json({
+      partners,
+      pagination: {
+        currentPage: parseInt(page),
+        totalPages,
+        totalPartners,
+        hasNextPage: parseInt(page) < totalPages,
+        hasPrevPage: parseInt(page) > 1,
+        limit: parseInt(limit)
+      }
+    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Server error' });

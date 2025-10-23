@@ -37,5 +37,6 @@ router.get('/my-visits', auth, partnerController.getUserVisits);
 
 // Partner stats
 router.get('/partner-stats', isPartner, partnerController.getPartnerStats);
+router.get('/partner-visits', isPartner, partnerController.getPartnerVisits);
 
 module.exports = router;

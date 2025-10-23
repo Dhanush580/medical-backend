@@ -1,6 +1,6 @@
 # Medico Backend
 
-Express + MongoDB backend for the Medico (HealthConnect) frontend.
+Express + MongoDB backend for the Medico (MEDI COST SAVER) frontend.
 
 Folders:
 - models: Mongoose models (User, Plan, Partner, Visit)
